@@ -11,11 +11,8 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'slate_gray_warm_cream_minimal_key')
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 ALLOWED_EXTENSIONS = {'pdf', 'docx', 'doc', 'txt'}
-
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -28,7 +25,7 @@ def index():
 @app.route('/api/score-resume', methods=['POST'])
 def score_resume():
     """
-    Feature 1: Upload resume and get instant general ATS score.
+    Feature 1: Upload resume and get instant general ATS score (pure in-memory).
     """
     if 'resume' not in request.files:
         return jsonify({"success": False, "error": "Please upload a resume file."}), 400
@@ -42,11 +39,9 @@ def score_resume():
         
     try:
         filename = secure_filename(file.filename)
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(save_path)
         
-        # Extract text from resume
-        resume_text = resume_parser.parse_resume_file(save_path)
+        # Extract text directly in memory without writing to disk (serverless & cloud safe)
+        resume_text = resume_parser.parse_resume_stream(file, filename=filename)
         
         # Analyze ATS score with Gemini
         ats_result = gemini_service.analyze_general_ats_score(resume_text)
@@ -59,7 +54,7 @@ def score_resume():
 @app.route('/api/match-job', methods=['POST'])
 def match_job():
     """
-    Feature 2: Enter job title/description + upload resume to get targeted ATS fit score.
+    Feature 2: Enter job title/description + upload resume to get targeted ATS fit score (pure in-memory).
     """
     if 'resume' not in request.files:
         return jsonify({"success": False, "error": "Please upload a resume file."}), 400
@@ -79,11 +74,9 @@ def match_job():
         
     try:
         filename = secure_filename(file.filename)
-        save_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(save_path)
         
-        # Extract text
-        resume_text = resume_parser.parse_resume_file(save_path)
+        # Extract text directly in memory without writing to disk (serverless & cloud safe)
+        resume_text = resume_parser.parse_resume_stream(file, filename=filename)
         
         # Analyze targeted ATS match with Gemini
         match_result = gemini_service.analyze_job_targeted_ats_score(resume_text, job_title, job_description)
